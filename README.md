@@ -241,8 +241,8 @@ curl -X POST "http://localhost:3000/api/sync" -H "x-cron-key: $SYNC_CRON_KEY"
 
 The repo is Vercel-ready with a **build-time database bootstrap**:
 
-1. Push the repo to GitHub, then import it at <https://vercel.com/new> (framework auto-detects Next.js,
-   Bun is used because `bun.lock` is present).
+1. Import the repo at <https://vercel.com/new> — **name the project `litpulse`** (the framework
+   auto-detects Next.js; Bun is used because `bun.lock` is present).
 2. Set the environment variable `COURTLISTENER_TOKEN` (free token from
    <https://www.courtlistener.com/profile/>) so the build can bake real dockets into the snapshot.
    `DATABASE_URL` can stay unset — the build script defaults it to `file:./db/custom.db`.
