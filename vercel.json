@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "bun run vercel:build",
+  "crons": [
+    {
+      "path": "/api/sync/pulse",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

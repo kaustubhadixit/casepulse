@@ -1,0 +1,201 @@
+// PatentPulse - IP Litigation Intelligence (functional study clone)
+// SQLite datasource: enum-like fields are stored as strings and validated in src/lib/constants.ts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  name         String?
+  passwordHash String
+  role         String          @default("USER") // USER | ADMIN
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  sessions     Session[]
+  watchlist    WatchlistItem[]
+}
+
+model Session {
+  id        String   @id // random session token
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// A litigation / opposition / review proceeding.
+// jurisdiction: DISTRICT_COURT | PTAB | UPC | EPO_OPPOSITION | ITC | SEP
+model Case {
+  id              String          @id @default(cuid())
+  caseNumber      String          @unique
+  sourceId        String?         @unique // upstream docket id (CourtListener) — change-cursor identity
+  title           String
+  jurisdiction    String
+  court           String
+  courtDetail     String? // division / local division detail
+  judge           String?
+  status          String          @default("Active")
+  cause           String? // cause of action / proceeding type
+  techArea        String?
+  summary         String?
+  damagesAwarded  Float?
+  filingDate      DateTime
+  closedDate      DateTime?
+  source          String          @default("seed") // seed | sync | manual
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  parties         CaseParty[]
+  patents         CasePatent[]
+  lawFirms        CaseLawFirm[]
+  events          CaseEvent[]
+  watchers        WatchlistItem[]
+
+  @@index([jurisdiction])
+  @@index([court])
+  @@index([status])
+  @@index([filingDate])
+  @@index([techArea])
+}
+
+// Company / NPE / university / individual involved in a case
+model Party {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String      @unique
+  type        String      @default("COMPANY") // COMPANY | NPE | UNIVERSITY | INDIVIDUAL
+  hqCountry   String?
+  hqCity      String?
+  description String?
+  caseLinks   CaseParty[]
+
+  @@index([type])
+}
+
+model CaseParty {
+  id      String @id @default(cuid())
+  caseId  String
+  partyId String
+  role    String // PLAINTIFF | DEFENDANT | PETITIONER | RESPONDENT | OPPONENT | PROPRIETOR
+  case    Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, partyId, role])
+  @@index([partyId])
+  @@index([caseId])
+  @@index([role])
+}
+
+model Patent {
+  id         String        @id @default(cuid())
+  number     String        @unique
+  title      String
+  techArea   String?
+  assignee   String?
+  filingDate DateTime?
+  grantDate  DateTime?
+  status     String        @default("Active") // Active | Expired | Lapsed
+  claimCount Int?
+  abstract   String?
+  cases      CasePatent[]
+
+  @@index([techArea])
+}
+
+model CasePatent {
+  id       String @id @default(cuid())
+  caseId   String
+  patentId String
+  case     Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patent   Patent @relation(fields: [patentId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, patentId])
+  @@index([patentId])
+  @@index([caseId])
+}
+
+model LawFirm {
+  id        String        @id @default(cuid())
+  slug      String        @unique
+  name      String
+  city      String?
+  country   String?
+  caseLinks CaseLawFirm[]
+
+  @@index([name])
+}
+
+model CaseLawFirm {
+  id        String  @id @default(cuid())
+  caseId    String
+  lawFirmId String
+  side      String // PLAINTIFF | DEFENDANT
+  case      Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  lawFirm   LawFirm @relation(fields: [lawFirmId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, lawFirmId, side])
+  @@index([lawFirmId])
+  @@index([side])
+}
+
+model CaseEvent {
+  id          String   @id @default(cuid())
+  caseId      String
+  date        DateTime
+  kind        String // FILING | ANSWER | SCHEDULING | MARKMAN | ORDER | RULING | JUDGMENT | VERDICT | TRIAL | SETTLEMENT | DISMISSAL | INSTITUTION | DECISION | APPEAL | WITHDRAWAL
+  description String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@index([caseId])
+}
+
+model NewsItem {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String
+  category    String // LITIGATION | PTAB | UPC | OPPOSITION | SEP | ITC | MARKET
+  sourceName  String
+  url         String?
+  publishedAt DateTime @default(now())
+
+  @@index([publishedAt])
+}
+
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  caseId    String
+  note      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, caseId])
+  @@index([userId])
+}
+
+model SyncLog {
+  id              String   @id @default(cuid())
+  ranAt           DateTime @default(now())
+  source          String // live-engine | backfill | demo | manual
+  recordsIngested Int      @default(0)
+  casesUpdated    Int      @default(0)
+  notes           String?
+}
+
+// Key/value state for the live engine (change cursors, counters).
+// Kept in the DB so a restart resumes exactly where it left off.
+model SyncState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,48 @@
+# dependencies
+node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# database (regenerate with: bun run db:push && bun run db:seed)
+db/*.db
+db/*.db-journal
+
+# env files (commit .env.example, never real secrets)
+.env
+.env.local
+.env.*.local
+
+# misc
+.DS_Store
+*.pem
+*.log
+dev.log
+server.log
+
+# typescript
+*.tsbuildinfo
+
+# vercel
+.vercel
+
+# sandbox tooling (not part of the app)
+/skills/
+/examples/
+/tests/
+/mini-services/
+.zscripts/
+Caddyfile
+download/
+upload/
+prompt
+local-*
+.claude
+.z-ai-config
